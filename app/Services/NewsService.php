@@ -102,7 +102,6 @@ class NewsService
 
         // 3. Ambil data artikel dari API eksternal
         $url = $this->baseApi . str_replace('/api', '', $endpoint);
-        \Log::debug($url);
         $response = Http::get($url);
 
         if (!$response->successful()) {
