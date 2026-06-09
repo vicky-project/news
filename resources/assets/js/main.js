@@ -1,15 +1,13 @@
 // ========== INISIALISASI & EVENT DELEGATION ==========
 document.addEventListener('DOMContentLoaded', async () => {
-  // Ambil daftar sumber pertama kali
   await fetchSources();
   renderAll();
 
-  // Delegasi event klik
   document.body.addEventListener('click', async (e) => {
-    // Klik item sumber
-    if (e.target.closest('.source-item')) {
+    // Klik source pill
+    if (e.target.closest('.source-pill')) {
       e.preventDefault();
-      const el = e.target.closest('.source-item');
+      const el = e.target.closest('.source-pill');
       const slug = el.dataset.source;
 
       if (AppState.currentSource === slug) return;
@@ -21,7 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderAll();
     }
 
-    // Klik kategori pill
+    // Klik category pill
     if (e.target.closest('.category-pill')) {
       const pill = e.target.closest('.category-pill');
       const type = pill.dataset.type;

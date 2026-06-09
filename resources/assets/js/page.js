@@ -1,19 +1,18 @@
 // ========== RENDER FUNCTIONS ==========
 
 function renderSourceList() {
-  const container = document.getElementById('source-list');
-  container.querySelectorAll('.source-item').forEach(el => el.remove());
+  const container = document.getElementById('source-bar');
+  container.innerHTML = '';
 
   AppState.sources.forEach(src => {
-    const a = document.createElement('a');
-    a.className = 'source-item';
+    const pill = document.createElement('span');
+    pill.className = 'source-pill';
     if (AppState.currentSource === src.slug) {
-      a.classList.add('active');
+      pill.classList.add('active');
     }
-    a.href = '#';
-    a.dataset.source = src.slug;
-    a.innerHTML = `<i class="bi bi-dot me-1"></i>${api.escapeHtml(src.name)}`;
-    container.appendChild(a);
+    pill.dataset.source = src.slug;
+    pill.textContent = src.name;
+    container.appendChild(pill);
   });
 }
 
@@ -43,17 +42,18 @@ function renderArticles() {
   const container = document.getElementById('news-container');
   if (AppState.articles.length === 0 && !AppState.isLoading) {
     container.innerHTML = `
-    <div class="empty-state">
-    <i class="bi bi-inbox display-3" style="color: var(--tg-theme-hint-color);"></i>
-    <h4 class="mt-3">Tidak ada berita</h4>
-    <p style="color: var(--tg-theme-hint-color);">Coba pilih kategori lain atau periksa kembali nanti.</p>
+    <div class="empty-state text-center py-4">
+    <i class="bi bi-inbox display-4" style="color: var(--tg-theme-hint-color); opacity:0.5;"></i>
+    <h6 class="mt-2">Tidak ada berita</h6>
+    <small style="color: var(--tg-theme-hint-color);">Coba pilih kategori lain</small>
     </div>`;
     return;
   }
 
-  let html = '<div class="row g-4">';
+  let html = '<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">';
   AppState.articles.forEach(article => {
-    const imgSrc = article.image?.small || 'https://via.placeholder.com/360x200?text=No+Image';
+    const imgSrc = (article.image?.small && article.image.small.startsWith('http'))
+    ? article.image.small: 'https://via.placeholder.com/360x200?text=No+Image';
     const title = api.escapeHtml(article.title || 'Tanpa Judul');
     const snippet = api.escapeHtml(article.contentSnippet || '').substring(0, 100);
     const link = article.link || '#';
@@ -62,15 +62,15 @@ function renderArticles() {
     }): '';
 
     html += `
-    <div class="col-md-6 col-lg-4">
+    <div class="col">
     <div class="news-card" onclick="window.open('${link}', '_blank')">
     <img src="${imgSrc}" class="news-img" alt="${title}">
     <div class="card-body">
     <h5 class="card-title">${title}</h5>
     <p class="card-text">${snippet}...</p>
-    <div class="d-flex justify-content-between align-items-center mt-2">
+    <div class="d-flex justify-content-between align-items-center">
     <small style="color: var(--tg-theme-hint-color);">${date}</small>
-    <span class="badge" style="background: var(--accent); color: white;">Baca</span>
+    <span class="badge" style="background: var(--accent); color: white; font-size:0.65rem;">Baca</span>
     </div>
     </div>
     </div>
@@ -80,20 +80,10 @@ function renderArticles() {
   container.innerHTML = html;
 }
 
-function updateNavLabel() {
-  const label = document.getElementById('current-source-label');
-  if (AppState.currentSource) {
-    const src = AppState.sources.find(s => s.slug === AppState.currentSource);
-    label.textContent = src ? `Sumber: ${src.name}`: '';
-  } else {
-    label.textContent = 'Pilih sumber berita';
-  }
-}
-
+// Tidak ada updateNavLabel lagi
 function renderAll() {
   renderSourceList();
   renderCategoryBar();
-  updateNavLabel();
   if (AppState.currentSource) {
     renderArticles();
   }
