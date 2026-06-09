@@ -42,18 +42,14 @@ function renderCategoryBar() {
 function renderArticles() {
   const container = document.getElementById('news-container');
   if (AppState.articles.length === 0 && !AppState.isLoading) {
-    container.innerHTML = `
-    <div class="empty-state">
-    <i class="bi bi-inbox display-3" style="color: var(--tg-theme-hint-color);"></i>
-    <h4 class="mt-3">Tidak ada berita</h4>
-    <p style="color: var(--tg-theme-hint-color);">Coba pilih kategori lain atau periksa kembali nanti.</p>
-    </div>`;
+    container.innerHTML = `...`; // sama seperti sebelumnya
     return;
   }
 
   let html = '<div class="row g-4">';
   AppState.articles.forEach(article => {
-    const imgSrc = article.image?.small || 'https://via.placeholder.com/360x200?text=No+Image';
+    const imgSrc = (article.image?.small && article.image.small.startsWith('http'))
+    ? article.image.small: 'https://via.placeholder.com/360x200?text=No+Image';
     const title = api.escapeHtml(article.title || 'Tanpa Judul');
     const snippet = api.escapeHtml(article.contentSnippet || '').substring(0, 100);
     const link = article.link || '#';

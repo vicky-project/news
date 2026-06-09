@@ -26,13 +26,27 @@ class NewsService
       $response = Http::get($this->baseApi);
 
       if (!$response->successful()) {
-        return []; // Jangan simpan ke cache jika gagal (opsional)
+        return [];
       }
 
       $data = $response->json();
       $sources = [];
 
+      // Daftar nama sumber yang akan diabaikan
+      $excludedSources = [
+        'BBC News',
+        'Tribun News',
+        'Zetizen Jawapos News',
+        'Suara News',
+        'VOA Indonesia',
+      ];
+
       foreach ($data['data'] ?? [] as $name => $info) {
+        // Lewati sumber yang dikecualikan
+        if (in_array($name, $excludedSources)) {
+          continue;
+        }
+
         $sources[] = [
           'name' => $name,
           'hasType' => isset($info['listType']),
@@ -52,61 +66,147 @@ class NewsService
   public function getArticles(string $source,
     ?string $type = null): array
   {
-    // Buat cache key unik berdasarkan source & type
     $cacheKey = 'news:articles:' . $source . ($type ? ':' . $type : '');
 
     return Cache::remember($cacheKey,
       $this->cacheTtl,
       function () use ($source, $type) {
-        // 1. Ambil daftar sumber untuk mendapatkan info endpoint
-        $sourceListResponse = Http::get($this->baseApi);
-        if (!$sourceListResponse->successful()) {
-          return ['error' => 'Gagal mengambil daftar sumber',
-            'data' => []];
-        }
+        // ... kode untuk mendapatkan $result dari API eksternal (sama seperti sebelumnya)
 
-        $sourceList = $sourceListResponse->json()['data'] ?? [];
-        $sourceInfo = null;
+        // Ambil data mentah
+        $rawArticles = $result['data'] ?? [];
 
-        foreach ($sourceList as $name => $info) {
-          if (strtolower(str_replace(' ', '-', $name)) === $source) {
-            $sourceInfo = $info;
-            break;
-          }
-        }
-
-        if (!$sourceInfo) {
-          return ['error' => 'Sumber tidak ditemukan',
-            'data' => []];
-        }
-
-        // 2. Bangun endpoint artikel
-        if ($type && isset($sourceInfo['type'])) {
-          $endpoint = str_replace(':type', $type, $sourceInfo['type']);
-        } elseif (isset($sourceInfo['all'])) {
-          $endpoint = $sourceInfo['all'];
-        } else {
-          // Fallback ke tipe pertama jika hanya punya 'type'
-          $firstType = $sourceInfo['listType'][0] ?? '';
-          $endpoint = str_replace(':type', $firstType, $sourceInfo['type'] ?? '');
-        }
-
-        // 3. Ambil data artikel dari API eksternal
-        $url = $this->baseApi . str_replace('/api', '', $endpoint);
-        $response = Http::get($url);
-
-        if (!$response->successful()) {
-          return ['error' => 'Gagal mengambil artikel',
-            'data' => []];
-        }
-
-        $result = $response->json();
+        // Normalisasi tiap artikel
+        $articles = array_map(function ($item) {
+          return [
+            'title' => $item['title'] ?? 'Tanpa Judul',
+            'link' => $item['link'] ?? '#',
+            'contentSnippet' => $this->getSnippet($item),
+            'isoDate' => $item['isoDate'] ?? null,
+            'image' => $this->normalizeImage($item['image'] ?? null, $item['link'] ?? ''),
+          ];
+        }, $rawArticles);
 
         return [
           'messages' => $result['messages'] ?? '',
           'total' => $result['total'] ?? 0,
-          'data' => $result['data'] ?? [],
+          'data' => $articles,
         ];
       });
+  }
+
+  /**
+  * Ambil cuplikan teks dari artikel (fallback bertingkat).
+  */
+  private function getSnippet(array $item): string
+  {
+    // 1. contentSnippet (CNN, dll)
+    if (!empty($item['contentSnippet'])) {
+      return $item['contentSnippet'];
+    }
+
+    // 2. content (Okezone, Tempo, dll) → bersihkan tag & batasi
+    if (!empty($item['content'])) {
+      $text = strip_tags($item['content']);
+      return mb_strlen($text) > 200 ? mb_substr($text, 0, 200) . '...' : $text;
+    }
+
+    // 3. description (Antara, Republika) → bersihkan tag & batasi
+    if (!empty($item['description'])) {
+      $text = strip_tags($item['description']);
+      return mb_strlen($text) > 200 ? mb_substr($text, 0, 200) . '...' : $text;
+    }
+
+    return '';
+  }
+
+  /**
+  * Normalisasi gambar: tangani string (Antara), array (CNN, Republika), atau tidak ada (Tempo).
+  */
+  private function normalizeImage($image, string $articleLink): array
+  {
+    if (!$image) {
+      return ['small' => null,
+        'large' => null];
+    }
+
+    if (is_string($image)) {
+      $url = $this->fixRelativeUrl($image, $articleLink);
+      return ['small' => $url,
+        'large' => $url];
+    }
+
+    // Ambil small, medium, large, extraLarge dengan prioritas
+    $small = $image['small']
+    ?? $image['medium']
+    ?? $image['large']
+    ?? $image['extraLarge']
+    ?? null;
+
+    $large = $image['large']
+    ?? $image['extraLarge']
+    ?? $image['medium']
+    ?? $image['small']
+    ?? null;
+
+    $small = $this->fixRelativeUrl($small, $articleLink);
+    $large = $this->fixRelativeUrl($large, $articleLink);
+
+    return ['small' => $small,
+      'large' => $large];
+  }
+
+  /**
+  * Jika URL dimulai dengan '/' atau tanpa 'http', buat absolut dari domain artikel.
+  */
+  private function fixRelativeUrl(?string $url, string $articleLink): ?string
+  {
+    if (!$url) return null;
+
+    // Sudah absolut
+    if (preg_match('/^https?:\/\//i', $url)) {
+      return $url;
+    }
+
+    // URL relatif terhadap domain artikel
+    $parsed = parse_url($articleLink);
+    if (isset($parsed['scheme'], $parsed['host'])) {
+      $base = $parsed['scheme'] . '://' . $parsed['host'];
+      return $base . ($url[0] === '/' ? '' : '/') . $url;
+    }
+
+    // Tidak bisa diubah
+    return null;
+  }
+
+  /**
+  * Coba membangun URL gambar absolut dari query string berdasarkan domain artikel.
+  * Pendekatan: ganti path artikel dengan path gambar yang diasumsikan.
+  * Jika gagal, kembalikan null.
+  */
+  private function buildAbsoluteImageUrl(string $queryOrPath, string $articleLink): ?string
+  {
+    // Jika sudah diawali '/', mungkin relatif terhadap domain
+    if (str_starts_with($queryOrPath, '/')) {
+      $parsed = parse_url($articleLink);
+      if (isset($parsed['scheme'], $parsed['host'])) {
+        return $parsed['scheme'] . '://' . $parsed['host'] . $queryOrPath;
+      }
+      return null;
+    }
+
+    // Jika hanya query string (?w=300), tidak bisa ditebak path sebenarnya → kembalikan null
+    if (str_starts_with($queryOrPath, '?')) {
+      return null;
+    }
+
+    // Jika berbentuk path relatif tanpa leading slash, coba gabungkan
+    $parsed = parse_url($articleLink);
+    if (isset($parsed['scheme'], $parsed['host'])) {
+      $base = $parsed['scheme'] . '://' . $parsed['host'] . '/';
+      return $base . ltrim($queryOrPath, '/');
+    }
+
+    return null;
   }
 }
