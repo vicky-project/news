@@ -1,0 +1,33 @@
+{
+  "name": "vicky-project/news-module",
+  "type": "laravel-module",
+  "license": "MIT",
+  "description": "",
+  "authors": [{
+    "name": "Vicky Rahman",
+    "email": "pratamavr@gmail.com"
+  }],
+  "extra": {
+    "laravel": {
+      "providers": [],
+      "aliases": {}
+    }
+  },
+  "require": {
+    "php": "^8.2",
+    "joshbrw/laravel-module-installer": "^1.0",
+    "vicky-project/telegram-module": "^1.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Modules\\News\\": "app/",
+      "Modules\\News\\Database\\Factories\\": "database/factories/",
+      "Modules\\News\\Database\\Seeders\\": "database/seeders/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Modules\\News\\Tests\\": "tests/"
+    }
+  }
+}
