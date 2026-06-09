@@ -1,4 +1,4 @@
-@extends('news::layouts.telegram')
+@extends('telegram::layouts.mini-app')
 
 @section('title', 'NewsHub')
 
